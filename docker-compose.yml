@@ -1,0 +1,39 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mustian-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./backend/uploads:/app/uploads
+    environment:
+      - DATABASE_URL=sqlite:///./mustian_face.db
+      - SECRET_KEY=mustian-face-secret-key-production-ready
+      - ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - FACE_CONFIDENCE_THRESHOLD=0.6
+      - USE_SIMPLE_FACE_RECOGNITION=True
+      - ATTENDANCE_WINDOW_MINUTES=30
+    restart: unless-stopped
+    networks:
+      - mustian-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mustian-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - mustian-network
+
+networks:
+  mustian-network:
+    driver: bridge

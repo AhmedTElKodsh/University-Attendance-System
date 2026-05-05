@@ -1,0 +1,49 @@
+services:
+  # PostgreSQL Database (Render Managed)
+  - type: postgres
+    name: mustian-db
+    databaseName: mustian_prod
+    user: mustian_user
+    plan: free
+
+  # Backend API (Docker)
+  - type: web
+    name: mustian-backend
+    env: docker
+    plan: free
+    branch: main
+    numInstances: 1
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mustian-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: FACE_CONFIDENCE_THRESHOLD
+        value: "0.6"
+      - key: USE_SIMPLE_FACE_RECOGNITION
+        value: "True"
+      - key: ATTENDANCE_WINDOW_MINUTES
+        value: "30"
+      - key: UPLOAD_DIR
+        value: uploads/faces
+      - key: CORS_ORIGINS
+        value: '["https://mustian-frontend.onrender.com"]'
+
+  # Frontend (Docker with build arg)
+  - type: web
+    name: mustian-frontend
+    env: docker
+    plan: free
+    branch: main
+    numInstances: 1
+    buildCommand: docker build --build-arg REACT_APP_API_URL=https://mustian-backend.onrender.com -t mustian-frontend .
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://mustian-backend.onrender.com
