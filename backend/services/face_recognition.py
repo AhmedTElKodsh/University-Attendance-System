@@ -33,6 +33,11 @@ class FaceRecognitionService:
         
         # Use the first face found
         embedding = encodings[0]
+        
+        # Validate embedding shape (should be 128-dimensional)
+        if embedding.shape != (128,):
+            return None
+        
         return embedding.tobytes()
     
     def compare_embeddings(self, known_embedding_bytes: bytes, 
@@ -44,6 +49,10 @@ class FaceRecognitionService:
         # Convert bytes back to numpy arrays
         known_embedding = np.frombuffer(known_embedding_bytes, dtype=np.float64)
         unknown_embedding = np.frombuffer(unknown_embedding_bytes, dtype=np.float64)
+        
+        # Validate embedding shapes
+        if known_embedding.shape != (128,) or unknown_embedding.shape != (128,):
+            return False, 0.0
         
         # Calculate face distance (0 = perfect match)
         distance = face_recognition.face_distance([known_embedding], unknown_embedding)[0]

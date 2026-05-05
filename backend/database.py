@@ -1,11 +1,12 @@
-tfrom sqlalchemy import (
+from sqlalchemy import (
     Column, Integer, String, DateTime, Boolean, Time, Date, Enum, 
-    ForeignKey, UniqueConstraint, LargeBinary, Float
+    ForeignKey, UniqueConstraint, LargeBinary, Float, Index
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, create_engine
-from datetime import datetime
+from datetime import datetime, timezone
 import enum
+import os
 
 Base = declarative_base()
 
@@ -48,11 +49,11 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
-    password = Column(String, nullable=False)
+    hashed_password = Column(String, nullable=False)
     role = Column(Enum(UserRole), nullable=False)
     status = Column(Enum(Status), default=Status.active)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     doctor = relationship("Doctor", back_populates="user", uselist=False)
@@ -70,13 +71,17 @@ class Student(Base):
     academic_level = Column(String, nullable=False)
     program = Column(String, nullable=False)
     status = Column(Enum(Status), default=Status.active)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     enrollments = relationship("Enrollment", back_populates="student")
     attendance_records = relationship("AttendanceRecord", back_populates="student")
     face_profile = relationship("FaceProfile", back_populates="student", uselist=False)
+    
+    __table_args__ = (
+        Index('idx_student_id', 'student_id'),
+    )
 
 class Doctor(Base):
     __tablename__ = "doctors"
@@ -91,8 +96,8 @@ class Doctor(Base):
     department = Column(String, nullable=False)
     academic_title = Column(String, nullable=False)
     status = Column(Enum(Status), default=Status.active)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     user = relationship("User", back_populates="doctor")
@@ -112,8 +117,8 @@ class Course(Base):
     academic_year = Column(String, nullable=False)
     semester = Column(String, nullable=False)
     status = Column(Enum(Status), default=Status.active)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     crns = relationship("CRN", back_populates="course")
@@ -133,8 +138,8 @@ class CRN(Base):
     location = Column(String, nullable=False)
     room = Column(String, nullable=False)
     status = Column(Enum(Status), default=Status.active)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     course = relationship("Course", back_populates="crns")
@@ -151,8 +156,8 @@ class Enrollment(Base):
     crn_id = Column(Integer, ForeignKey("crns.id"), nullable=False)
     academic_year = Column(String, nullable=False)
     semester = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     student = relationship("Student", back_populates="enrollments")
@@ -179,8 +184,8 @@ class Lecture(Base):
     location = Column(String, nullable=False)
     status = Column(Enum(LectureStatus), default=LectureStatus.scheduled)
     cancellation_reason = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     course = relationship("Course", back_populates="lectures")
@@ -200,8 +205,8 @@ class AttendanceRecord(Base):
     attendance_time = Column(DateTime, nullable=False)
     recorded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     method = Column(Enum(RecordMethod), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     lecture = relationship("Lecture", back_populates="attendance_records")
@@ -209,9 +214,12 @@ class AttendanceRecord(Base):
     course = relationship("Course")
     crn = relationship("CRN")
     
-    # Unique constraint
+    # Unique constraint and indexes
     __table_args__ = (
         UniqueConstraint("lecture_id", "student_id", name="uix_lecture_student"),
+        Index('idx_attendance_lecture', 'lecture_id'),
+        Index('idx_attendance_student', 'student_id'),
+        Index('idx_attendance_course', 'course_id'),
     )
 
 class FaceProfile(Base):
@@ -221,9 +229,9 @@ class FaceProfile(Base):
     student_id = Column(Integer, ForeignKey("students.id"), unique=True, nullable=False)
     face_embedding = Column(LargeBinary, nullable=False)
     image_reference = Column(String, nullable=True)
-    confidence_threshold = Column(Float, default=0.6)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    confidence_threshold = Column(Float, default=0.7)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     student = relationship("Student", back_populates="face_profile")
@@ -239,7 +247,7 @@ class AttendanceEditLog(Base):
     old_status = Column(Enum(AttendanceStatus), nullable=False)
     new_status = Column(Enum(AttendanceStatus), nullable=False)
     reason = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relationships
     lecture = relationship("Lecture")
@@ -248,15 +256,31 @@ class AttendanceEditLog(Base):
 
 # Database setup
 from backend.config import settings
-import os
 
-# Railway provides DATABASE_URL for PostgreSQL
+# Fail fast if SQLite in production
+if os.getenv("ENVIRONMENT", "development") == "production" and settings.DATABASE_URL.startswith("sqlite"):
+    raise RuntimeError("SQLite is not supported in production. Please use PostgreSQL.")
+
 # Handle SQLite vs PostgreSQL connection args
 connect_args = {}
+pool_config = {}
+
 if settings.DATABASE_URL.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
+else:
+    # PostgreSQL connection pooling
+    pool_config = {
+        "pool_size": 20,
+        "max_overflow": 10,
+        "pool_pre_ping": True,  # Verify connections before using
+        "pool_recycle": 3600,   # Recycle connections after 1 hour
+    }
 
-engine = create_engine(settings.DATABASE_URL, connect_args=connect_args)
+engine = create_engine(
+    settings.DATABASE_URL, 
+    connect_args=connect_args,
+    **pool_config
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def create_tables():
@@ -265,6 +289,11 @@ def create_tables():
 def get_db():
     db = SessionLocal()
     try:
+        # Test connection
+        db.execute("SELECT 1")
         yield db
+    except Exception as e:
+        db.rollback()
+        raise RuntimeError(f"Database connection failed: {str(e)}")
     finally:
         db.close()

@@ -17,7 +17,7 @@ def seed_admin():
             admin = User(
                 name="System Admin",
                 email="admin@mustian.edu",
-                password=pwd_context.hash("admin123"),  # CHANGE IN PRODUCTION!
+                hashed_password=pwd_context.hash("admin123"),  # CHANGE IN PRODUCTION!
                 role=UserRole.admin,
                 status=Status.active
             )
@@ -65,7 +65,7 @@ def seed_sample_data():
         doctor_user = User(
             name="Dr. Sarah Ahmed",
             email="sarah@mustian.edu",
-            password=pwd_context.hash("doctor123"),
+            hashed_password=pwd_context.hash("doctor123"),
             role=UserRole.doctor,
             status=Status.active
         )

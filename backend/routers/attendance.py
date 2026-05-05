@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request
 from sqlalchemy.orm import Session
 from typing import List
-from datetime import datetime
+from datetime import datetime, timezone
 import cv2
 import numpy as np
 from io import BytesIO
 from PIL import Image
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from backend.database import (
     User, Lecture, AttendanceRecord, FaceProfile, Enrollment, Student,
@@ -21,6 +23,7 @@ from backend.services.liveness import LivenessService
 from backend.services.attendance_service import AttendanceService
 
 router = APIRouter(prefix="/attendance", tags=["attendance"])
+limiter = Limiter(key_func=get_remote_address)
 
 
 # Get attendance screen data (for classroom device)
@@ -44,8 +47,7 @@ async def get_attendance_screen_data(
     crn = db.query(CRN).filter(CRN.id == crn_id).first()
     
     # Check if attendance is within time window
-    from datetime import datetime
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     attendance_open = lecture.attendance_open_time <= now <= lecture.attendance_close_time
     
     # Calculate time remaining (in seconds)
@@ -85,7 +87,7 @@ async def start_attendance_session(
         raise HTTPException(status_code=403, detail="Not authorized")
     
     lecture.status = LectureStatus.active
-    lecture.updated_at = datetime.utcnow()
+    lecture.updated_at = datetime.now(timezone.utc)
     db.commit()
     
     return {"message": "Attendance session started"}
@@ -93,13 +95,25 @@ async def start_attendance_session(
 
 # Record attendance via face recognition
 @router.post("/record", response_model=dict)
+@limiter.limit("10/minute")  # Rate limit: 10 face recognition attempts per minute
 async def record_attendance(
+    request: Request,
     lecture_id: int,
     image: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    # Read and decode image
+    # Validate file size (max 10MB)
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
     contents = await image.read()
+    
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="Image file too large (max 10MB)")
+    
+    # Validate MIME type
+    if image.content_type not in ["image/jpeg", "image/jpg", "image/png"]:
+        raise HTTPException(status_code=400, detail="Invalid image format. Only JPEG and PNG allowed")
+    
+    # Read and decode image
     nparr = np.frombuffer(contents, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     
@@ -119,9 +133,18 @@ async def record_attendance(
     if lecture.status != LectureStatus.active:
         raise HTTPException(status_code=400, detail="Lecture is not active")
     
+    # Validate attendance window
+    now = datetime.now(timezone.utc)
+    if not (lecture.attendance_open_time <= now <= lecture.attendance_close_time):
+        raise HTTPException(status_code=400, detail="Attendance window is closed")
+    
     # Get all face profiles for students enrolled in this CRN
     enrollments = db.query(Enrollment).filter(Enrollment.crn_id == lecture.crn_id).all()
     student_ids = [e.student_id for e in enrollments]
+    
+    # Validate student_ids are integers (prevent injection)
+    if not all(isinstance(sid, int) for sid in student_ids):
+        raise HTTPException(status_code=500, detail="Invalid student data")
     
     face_profiles = db.query(FaceProfile).filter(
         FaceProfile.student_id.in_(student_ids)
@@ -180,13 +203,23 @@ async def register_face(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # Validate file size (max 10MB)
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+    contents = await image.read()
+    
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="Image file too large (max 10MB)")
+    
+    # Validate MIME type
+    if image.content_type not in ["image/jpeg", "image/jpg", "image/png"]:
+        raise HTTPException(status_code=400, detail="Invalid image format. Only JPEG and PNG allowed")
+    
     # Check if student exists
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
     
     # Read and decode image
-    contents = await image.read()
     nparr = np.frombuffer(contents, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     
@@ -206,7 +239,7 @@ async def register_face(
     if existing_profile:
         # Update existing profile
         existing_profile.face_embedding = embedding_bytes
-        existing_profile.updated_at = datetime.utcnow()
+        existing_profile.updated_at = datetime.now(timezone.utc)
     else:
         # Create new profile
         new_profile = FaceProfile(
