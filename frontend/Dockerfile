@@ -8,11 +8,11 @@ WORKDIR /app
 ARG REACT_APP_API_URL=""
 
 # Copy package.json and install dependencies
-COPY package*.json ./
+COPY frontend/package*.json ./
 RUN npm install
 
 # Copy source code
-COPY . .
+COPY frontend/ .
 
 # Set environment variable for build
 ENV REACT_APP_API_URL=${REACT_APP_API_URL}
@@ -27,7 +27,7 @@ FROM nginx:alpine
 COPY --from=build /app/build /usr/share/nginx/html
 
 # Copy Nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
