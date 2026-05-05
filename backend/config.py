@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./mustian_face.db"
     
     # JWT - REQUIRED in production
-    SECRET_KEY: str = None  # Must be set via environment variable
+    SECRET_KEY: Optional[str] = "mustian-face-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
@@ -36,11 +36,12 @@ class Settings(BaseSettings):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Validate SECRET_KEY in production
-        if self.ENVIRONMENT == "production" and (not self.SECRET_KEY or self.SECRET_KEY == "mustian-face-secret-key-change-in-production"):
-            raise ValueError(
-                "SECRET_KEY must be set to a secure random value in production. "
-                "Generate one with: openssl rand -hex 32"
-            )
+        if self.ENVIRONMENT == "production":
+            if not self.SECRET_KEY or self.SECRET_KEY == "mustian-face-secret-key-change-in-production":
+                raise ValueError(
+                    "SECRET_KEY must be set to a secure random value in production. "
+                    "Generate one with: openssl rand -hex 32"
+                )
 
 
 settings = Settings()

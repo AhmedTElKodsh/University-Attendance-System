@@ -40,7 +40,7 @@ def test_user(client):
     user = User(
         name="Test Admin",
         email="admin@test.com",
-        password=hashed_password,
+        hashed_password=hashed_password,
         role="admin",
         status="active"
     )

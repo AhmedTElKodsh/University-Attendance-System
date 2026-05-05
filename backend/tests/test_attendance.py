@@ -36,11 +36,11 @@ def setup_test_data(client):
     db = TestingSessionLocal()
     
     # Create admin user
-    admin = User(name="Admin", email="admin@test.com", password=hashed_password, role="admin", status="active")
+    admin = User(name="Admin", email="admin@test.com", hashed_password=hashed_password, role="admin", status="active")
     db.add(admin)
     
     # Create doctor user
-    doctor_user = User(name="Doctor", email="doctor@test.com", password=hashed_password, role="doctor", status="active")
+    doctor_user = User(name="Doctor", email="doctor@test.com", hashed_password=hashed_password, role="doctor", status="active")
     db.add(doctor_user)
     db.commit()
     
@@ -49,6 +49,7 @@ def setup_test_data(client):
     db.add(student)
     
     # Create doctor
+    from backend.database import Doctor
     doctor = Doctor(user_id=doctor_user.id, staff_id="D001", full_name="Test Doctor", email="doctor@test.com", faculty="CS", department="IT", academic_title="Professor")
     db.add(doctor)
     

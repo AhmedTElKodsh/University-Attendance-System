@@ -1,9 +1,9 @@
 from sqlalchemy import (
     Column, Integer, String, DateTime, Boolean, Time, Date, Enum, 
-    ForeignKey, UniqueConstraint, LargeBinary, Float, Index
+    ForeignKey, UniqueConstraint, LargeBinary, Float, Index, create_engine
 )
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker, create_engine
+from sqlalchemy.orm import relationship, sessionmaker
 from datetime import datetime, timezone
 import enum
 import os
